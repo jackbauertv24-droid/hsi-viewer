@@ -95,6 +95,14 @@
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           "regex": "(?:Gold|XAU|XAUUSD)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
+        },
+        {
+          "id": "kitco",
+          "name": "Kitco",
+          "url": "https://www.kitco.com/gold-price/",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "regex": "(?:Gold|XAU)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
         }
       ]
     }

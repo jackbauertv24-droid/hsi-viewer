@@ -25,19 +25,19 @@
           "group": 1
         },
         {
-          "id": "bloomberg",
-          "name": "Bloomberg",
-          "url": "https://www.bloomberg.com/quote/HSI:IND?embedded-checkout=true",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "regex": "(?:Hang Seng|HSI|Index)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
+          "id": "tradingview",
+          "name": "TradingView HSI",
+          "url": "https://www.tradingview.com/symbols/HSI/",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "regex": "(?:Hang Seng|HSI)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
         },
         {
-          "id": "reuters",
-          "name": "Reuters",
-          "url": "https://www.reuters.com/markets/quote/.HSI/",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "regex": "(?:Hang Seng|HSI|Index)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
+          "id": "investing",
+          "name": "Investing.com HSI",
+          "url": "https://www.investing.com/indices/hang-sen-40",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "regex": "(?:Hang Seng|HSI)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
         }
       ]
@@ -65,18 +65,10 @@
           "group": 1
         },
         {
-          "id": "investing",
-          "name": "Investing.com",
-          "url": "https://www.investing.com/crypto/bitcoin",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "regex": "(?:Bitcoin|BTC)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
-          "group": 1
-        },
-        {
-          "id": "binance",
-          "name": "Binance",
-          "url": "https://www.binance.com/en/price/bitcoin",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "id": "gemini",
+          "name": "Gemini",
+          "url": "https://www.gemini.com/prices/bitcoin",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "regex": "(?:Bitcoin|BTC)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
         }
@@ -90,25 +82,17 @@
       "sources": [
         {
           "id": "tradingview",
-          "name": "TradingView",
+          "name": "TradingView Gold",
           "url": "https://www.tradingview.com/symbols/XAUUSD/",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "regex": "(?:Gold|XAU|XAUUSD)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
-          "group": 1
-        },
-        {
-          "id": "kitco",
-          "name": "Kitco",
-          "url": "https://www.kitco.com/gold-price/",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "regex": "(?:Gold|XAU)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
         },
         {
           "id": "veracash",
           "name": "VeraCash",
           "url": "https://www.veracash.com/gold-price-and-chart",
-          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "regex": "(?:Gold|XAU|Gold Price)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
         }

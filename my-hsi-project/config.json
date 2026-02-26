@@ -63,6 +63,14 @@
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           "regex": "(?:Bitcoin|BTC)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
+        },
+        {
+          "id": "yahoo-finance",
+          "name": "Yahoo Finance",
+          "url": "https://hk.finance.yahoo.com/quote/BTC-USD/",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "regex": "(?:Bitcoin|BTC|BTC-USD)[\\s\\S]{0,500}?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
         }
       ]
     }

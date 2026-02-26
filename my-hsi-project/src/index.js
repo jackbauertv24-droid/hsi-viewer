@@ -2,7 +2,7 @@
  * HSI Viewer - Main Entry Point
  * 
  * Orchestrates data fetching from multiple sources, validates accuracy,
- * and serves a real-time dashboard.
+ * and serves a real-time dashboard with dynamic cards for each data point.
  */
 
 const http = require('http');
@@ -19,7 +19,7 @@ const PORT = 3000;
 const HOST = '0.0.0.0';
 
 // Global state
-let latestData = {};
+let latestData = {}; // Stores validated data for each data point ID
 
 /**
  * Fetches and validates data for all configured data points.
@@ -61,51 +61,72 @@ async function updateAllData() {
   }
 }
 
-// Generate HTML Dashboard
-const generateHtml = (data) => {
-  const hsi = data.hsi || { status: 'loading', name: 'Hang Seng Index', value: 0, errors: [] };
-  
-  let contentHtml = '<div class="card"><h1>Loading...</h1><p>Waiting for first data fetch...</p></div>';
-
-  if (hsi.status === 'success') {
-    const isPositive = true; // Simplified for now
-    const colorClass = 'positive';
-    const arrow = '▲';
-    
-    contentHtml = `
+// Helper: Generate a single card HTML
+function generateCard(id, data) {
+  if (data.status === 'loading' || !data || !data.status) {
+    return `
       <div class="card">
-        <h1>${hsi.name}</h1>
-        <div class="price">${hsi.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <h1>${data.name || 'Loading...'}</h1>
+        <div class="price loading">Fetching data...</div>
         <div class="meta">
-          <div><span class="status-dot status-ok"></span>Live Data</div>
-          <div>Confidence: <strong>${hsi.confidence.toUpperCase()}</strong></div>
-          <div>Sources Used: ${hsi.sourceCount} (${hsi.sourceCount - hsi.outlierCount} valid)</div>
-          ${hsi.outlierCount > 0 ? `<div style="color:#d32f2f; font-size:0.8rem">⚠️ ${hsi.outlierCount} source(s) discarded as outliers</div>` : ''}
-          <div>Last Update: ${hsi.timestamp}</div>
-        </div>
-        
-        <div style="margin-top: 20px; text-align: left; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 10px;">
-          <strong>Source Details:</strong>
-          <ul style="padding-left: 20px; margin-top: 5px;">
-            ${hsi.sources.map(s => `<li>${s.sourceName}: ${s.value.toLocaleString()} (${s.latencyMs}ms)</li>`).join('')}
-            ${hsi.errors.map(e => `<li style="color:#999">${e.sourceName}: Failed (${e.error})</li>`).join('')}
-          </ul>
-        </div>
-      </div>
-    `;
-  } else if (hsi.status === 'error') {
-    contentHtml = `
-      <div class="card">
-        <h1>${hsi.name}</h1>
-        <div class="price" style="color:#d32f2f">Data Unavailable</div>
-        <div class="meta">
-          <div><span class="status-dot status-err"></span>Error</div>
-          <div>${hsi.message}</div>
-          ${hsi.errors && hsi.errors.length ? `<details><summary style="cursor:pointer; margin-top:10px">Show Details</summary>${hsi.errors.map(e => `<div>${e.sourceName}: ${e.error}</div>`).join('')}</details>` : ''}
+          <div><span class="status-dot"></span>Initializing</div>
         </div>
       </div>
     `;
   }
+
+  if (data.status === 'success') {
+    return `
+      <div class="card">
+        <h1>${data.name}</h1>
+        <div class="price">${data.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style="font-size:1rem;color:#666">${data.unit || ''}</span></div>
+        <div class="meta">
+          <div><span class="status-dot status-ok"></span>Live Data</div>
+          <div>Confidence: <strong>${data.confidence.toUpperCase()}</strong></div>
+          <div>Sources: ${data.sourceCount} (${data.sourceCount - (data.outlierCount || 0)} valid)</div>
+          ${data.outlierCount > 0 ? `<div style="color:#d32f2f; font-size:0.8rem">⚠️ ${data.outlierCount} outlier(s) discarded</div>` : ''}
+          <div>Updated: ${data.timestamp}</div>
+        </div>
+        
+        <details>
+          <summary>Source Details</summary>
+          <ul style="padding-left: 20px; margin-top: 5px; font-size: 0.85rem;">
+            ${data.sources ? data.sources.map(s => `<li>${s.sourceName}: ${s.value.toLocaleString()} (${s.latencyMs}ms)</li>`).join('') : ''}
+            ${data.errors ? data.errors.map(e => `<li style="color:#999">${e.sourceName}: ${e.error}</li>`).join('') : ''}
+          </ul>
+        </details>
+      </div>
+    `;
+  }
+
+  // Error state
+  return `
+    <div class="card">
+      <h1>${data.name}</h1>
+      <div class="price" style="color:#d32f2f">Data Unavailable</div>
+      <div class="meta">
+        <div><span class="status-dot status-err"></span>Error</div>
+        <div>${data.message || 'Unknown error'}</div>
+        ${data.errors && data.errors.length ? `
+          <details>
+            <summary>Show Details</summary>
+            ${data.errors.map(e => `<div style="font-size:0.85rem;margin-top:5px">${e.sourceName}: ${e.error}</div>`).join('')}
+          </details>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Generate HTML Dashboard - Dynamic Cards for each Data Point
+const generateHtml = (data) => {
+  const dataPoints = config.dataPoints || [];
+  
+  // Generate a card for each data point
+  const cardsHtml = dataPoints.map(point => {
+    const pointData = data[point.id];
+    return generateCard(point.id, pointData || { status: 'loading', name: point.name });
+  }).join('\n');
 
   return `
   <!DOCTYPE html>
@@ -113,11 +134,35 @@ const generateHtml = (data) => {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="${config.refreshIntervalSeconds}">
-    <title>${hsi.name || 'Market Data'} - Live</title>
+    <meta http-equiv="refresh" content="${config.refreshIntervalSeconds + (config.jitterSeconds || 0)}">
+    <title>Market Data Dashboard - Live</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-      .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 100%; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        background: #f0f2f5; 
+        margin: 0; 
+        padding: 20px; 
+        box-sizing: border-box; 
+      }
+      .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .card { 
+        background: white; 
+        padding: 2rem; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        text-align: center; 
+        transition: transform 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      }
       h1 { margin: 0 0 0.5rem 0; color: #1a1a1a; font-size: 1.5rem; }
       .price { font-size: 3rem; font-weight: 700; color: #1a1a1a; margin: 1rem 0; }
       .positive { color: #00c853; }
@@ -126,12 +171,15 @@ const generateHtml = (data) => {
       .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
       .status-ok { background-color: #00c853; }
       .status-err { background-color: #d32f2f; }
-      details { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 10px; }
-      summary { font-weight: bold; color: #555; }
+      .loading { color: #999; font-style: italic; }
+      details { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 10px; text-align: left; }
+      summary { font-weight: bold; color: #555; cursor: pointer; }
     </style>
   </head>
   <body>
-    ${contentHtml}
+    <div class="dashboard">
+      ${cardsHtml}
+    </div>
   </body>
   </html>
   `;
@@ -154,7 +202,7 @@ async function scheduleNext() {
   const jitter = config.jitterSeconds ? (Math.random() * config.jitterSeconds * 1000) : 0;
   const delay = baseInterval + jitter;
   
-  console.log(`\n⏱️  Next update in ${(delay/1000).toFixed(0)}s (Base: ${config.refreshIntervalSeconds}s + Jitter: ${(jitter/1000).toFixed(1)}s)...`);
+  console.log(`\n⏱️  Sleeping for ${(delay/1000).toFixed(0)}s (Base: ${config.refreshIntervalSeconds}s + Jitter: ${(jitter/1000).toFixed(1)}s)...`);
   
   setTimeout(async () => {
     await updateAllData();
@@ -164,12 +212,3 @@ async function scheduleNext() {
 
 updateAllData(); // Initial fetch immediately
 scheduleNext(); // Schedule recurring updates with random jitter
-
-server.listen(PORT, HOST, () => {
-  console.log(`\n🚀 HSI Viewer Server Running`);
-  console.log(`==========================`);
-  console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`⚙️  Config: ${configPath}`);
-  console.log(`🔄 Refresh: ${config.refreshIntervalSeconds}s`);
-  console.log(`\nPress Ctrl+C to stop\n`);
-});

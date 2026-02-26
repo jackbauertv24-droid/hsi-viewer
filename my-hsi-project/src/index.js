@@ -1,192 +1,162 @@
 /**
- * HSI Project - Main Entry Point
+ * HSI Viewer - Main Entry Point
  * 
- * Serves an HTML dashboard with real-time HSI data fetched from AASTOCKS.
- * Auto-refreshes data every 30 seconds.
+ * Orchestrates data fetching from multiple sources, validates accuracy,
+ * and serves a real-time dashboard.
  */
 
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
+const { fetchSource } = require('./fetcher');
+const { validateDataPoint } = require('./validator');
+
+// Load configuration
+const configPath = path.join(__dirname, '../config.json');
+const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 const PORT = 3000;
 const HOST = '0.0.0.0';
-const AASTOCKS_URL = 'http://www.aastocks.com';
 
-// Global variable to store latest data
-let latestHsiData = {
-    price: '---',
-    change: 0,
-    changePercent: 0,
-    timestamp: 'Loading...',
-    source: 'AASTOCKS (Live)',
-    status: 'fetching' // 'fetching', 'success', 'error'
-};
+// Global state
+let latestData = {};
 
 /**
- * Fetches HSI data from AASTOCKS homepage.
- * Parses the HTML to find the HSI price banner.
+ * Fetches and validates data for all configured data points.
  */
-async function getHsiData() {
-    try {
-        const response = await fetch(AASTOCKS_URL, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+async function updateAllData() {
+  console.log(`\n[${new Date().toLocaleTimeString()}] Starting data update cycle...`);
+  
+  for (const point of config.dataPoints) {
+    console.log(`  📊 Fetching ${point.name}...`);
+    
+    // Fetch from all sources in parallel
+    const fetchPromises = point.sources.map(source => fetchSource(source));
+    const results = await Promise.all(fetchPromises);
+    
+    // Validate and cross-check
+    const validated = validateDataPoint(results, point.tolerancePercent);
+    validated.name = point.name;
+    validated.unit = point.unit;
+    
+    latestData[point.id] = validated;
+    
+    // Log summary
+    if (validated.status === 'success') {
+      const outlierNote = validated.outlierCount > 0 ? ` (${validated.outlierCount} outlier discarded)` : '';
+      console.log(`     ✓ ${point.name}: ${validated.value.toLocaleString()} [Confidence: ${validated.confidence}]${outlierNote}`);
+      if (validated.outlierCount > 0) {
+        validated.outliers.forEach(o => {
+          console.log(`     ⚠️  Outlier: ${o.sourceName} reported ${o.value} (${o.deviation} diff)`);
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const html = await response.text();
-        
-        // Refined Strategy: Look specifically for the HSI price near keywords like "恒生指數", "恒指", or "HSI".
-        // The price format is typically xx,xxx.xx (with commas).
-        
-        // Pattern: Keyword followed by optional chars, then the price number
-        const hsiContextRegex = /(?:恒生指數|恒指|HSI|Hang Seng)[^0-9]{0,100}?(\d{1,3}(?:,\d{3})+\.\d{2})/i;
-        const contextMatch = html.match(hsiContextRegex);
-
-        if (contextMatch && contextMatch[1]) {
-            // Clean the price string (remove commas)
-            const price = parseFloat(contextMatch[1].replace(/,/g, ''));
-            
-            return {
-                price: price,
-                change: 0, // Change % parsing requires complex DOM parsing, keeping simple for now
-                changePercent: 0,
-                timestamp: new Date().toLocaleString('en-HK', { timeZone: 'Asia/Shanghai' }),
-                source: 'AASTOCKS (Live)',
-                status: 'success'
-            };
-        } else {
-            // Fallback: If specific context fails, try to find ANY large number (20,000+) that looks like HSI
-            const largePriceRegex = /(\d{2,3}(?:,\d{3})+\.\d{2})/g;
-            const allPrices = html.match(largePriceRegex);
-            
-            if (allPrices && allPrices.length > 0) {
-                // Take the first large number (likely HSI)
-                const price = parseFloat(allPrices[0].replace(/,/g, ''));
-                if (price > 10000) { // Sanity check: HSI should be > 10,000
-                    return {
-                        price: price,
-                        change: 0,
-                        changePercent: 0,
-                        timestamp: new Date().toLocaleString('en-HK', { timeZone: 'Asia/Shanghai' }),
-                        source: 'AASTOCKS (Live)',
-                        status: 'success'
-                    };
-                }
-            }
-            throw new Error('HSI price pattern not found in HTML');
-        }
-
-    } catch (error) {
-        console.error(`Error fetching HSI data: ${error.message}`);
-        return {
-            price: 0,
-            change: 0,
-            changePercent: 0,
-            timestamp: new Date().toLocaleString('en-HK', { timeZone: 'Asia/Shanghai' }),
-            source: 'AASTOCKS (Error)',
-            status: 'error',
-            errorMsg: error.message
-        };
+      }
+    } else {
+      console.log(`     ✗ ${point.name}: Failed - ${validated.message}`);
+      if (validated.errors && validated.errors.length > 0) {
+        validated.errors.forEach(err => {
+          console.log(`       - ${err.sourceName}: ${err.error}`);
+        });
+      }
     }
+  }
 }
 
 // Generate HTML Dashboard
 const generateHtml = (data) => {
-    const isPositive = data.change >= 0;
-    const colorClass = data.status === 'error' ? 'negative' : (isPositive ? 'positive' : 'negative');
-    const arrow = data.status === 'error' ? '⚠️' : (isPositive ? '▲' : '▼');
-    const displayPrice = data.status === 'error' ? 'N/A' : data.price.toLocaleString();
-    const displayChange = data.status === 'error' ? data.errorMsg : `${Math.abs(data.change).toLocaleString()} (${isPositive ? '+' : ''}${data.changePercent}%)`;
+  const hsi = data.hsi || { status: 'loading', name: 'Hang Seng Index', value: 0, errors: [] };
+  
+  let contentHtml = '<div class="card"><h1>Loading...</h1><p>Waiting for first data fetch...</p></div>';
 
-    return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
+  if (hsi.status === 'success') {
+    const isPositive = true; // Simplified for now
+    const colorClass = 'positive';
+    const arrow = '▲';
+    
+    contentHtml = `
+      <div class="card">
+        <h1>${hsi.name}</h1>
+        <div class="price">${hsi.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div class="meta">
+          <div><span class="status-dot status-ok"></span>Live Data</div>
+          <div>Confidence: <strong>${hsi.confidence.toUpperCase()}</strong></div>
+          <div>Sources Used: ${hsi.sourceCount} (${hsi.sourceCount - hsi.outlierCount} valid)</div>
+          ${hsi.outlierCount > 0 ? `<div style="color:#d32f2f; font-size:0.8rem">⚠️ ${hsi.outlierCount} source(s) discarded as outliers</div>` : ''}
+          <div>Last Update: ${hsi.timestamp}</div>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: left; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 10px;">
+          <strong>Source Details:</strong>
+          <ul style="padding-left: 20px; margin-top: 5px;">
+            ${hsi.sources.map(s => `<li>${s.sourceName}: ${s.value.toLocaleString()} (${s.latencyMs}ms)</li>`).join('')}
+            ${hsi.errors.map(e => `<li style="color:#999">${e.sourceName}: Failed (${e.error})</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+  } else if (hsi.status === 'error') {
+    contentHtml = `
+      <div class="card">
+        <h1>${hsi.name}</h1>
+        <div class="price" style="color:#d32f2f">Data Unavailable</div>
+        <div class="meta">
+          <div><span class="status-dot status-err"></span>Error</div>
+          <div>${hsi.message}</div>
+          ${hsi.errors && hsi.errors.length ? `<details><summary style="cursor:pointer; margin-top:10px">Show Details</summary>${hsi.errors.map(e => `<div>${e.sourceName}: ${e.error}</div>`).join('')}</details>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="30"> <!-- Auto-reload every 30s -->
-    <title>HSI Tracker - Live</title>
+    <meta http-equiv="refresh" content="${config.refreshIntervalSeconds}">
+    <title>${hsi.name || 'Market Data'} - Live</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 100%; }
-        h1 { margin: 0 0 0.5rem 0; color: #1a1a1a; font-size: 1.5rem; }
-        .price { font-size: 3rem; font-weight: 700; color: #1a1a1a; margin: 1rem 0; }
-        .change { font-size: 1.5rem; font-weight: 600; padding: 0.5rem 1rem; border-radius: 6px; display: inline-block; }
-        .positive { color: #00c853; background: #e8f5e9; }
-        .negative { color: #d32f2f; background: #ffebee; }
-        .meta { color: #666; margin-top: 1.5rem; font-size: 0.9rem; }
-        .refresh-hint { margin-top: 1rem; font-size: 0.8rem; color: #999; }
-        .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .status-ok { background-color: #00c853; }
-        .status-err { background-color: #d32f2f; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+      .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 100%; }
+      h1 { margin: 0 0 0.5rem 0; color: #1a1a1a; font-size: 1.5rem; }
+      .price { font-size: 3rem; font-weight: 700; color: #1a1a1a; margin: 1rem 0; }
+      .positive { color: #00c853; }
+      .negative { color: #d32f2f; }
+      .meta { color: #666; margin-top: 1.5rem; font-size: 0.95rem; line-height: 1.6; }
+      .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
+      .status-ok { background-color: #00c853; }
+      .status-err { background-color: #d32f2f; }
+      details { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 10px; }
+      summary { font-weight: bold; color: #555; }
     </style>
-    <script>
-        // Optional: Simple countdown to refresh
-        let secondsLeft = 30;
-        setInterval(() => {
-            secondsLeft--;
-            const el = document.getElementById('timer');
-            if(el) el.innerText = secondsLeft;
-            if(secondsLeft <= 0) secondsLeft = 30;
-        }, 1000);
-    </script>
-</head>
-<body>
-    <div class="card">
-        <h1>Hang Seng Index</h1>
-        <div class="price">${displayPrice}</div>
-        <div class="change ${colorClass}">
-            ${arrow} ${displayChange}
-        </div>
-        <div class="meta">
-            <div><span class="status-dot ${data.status === 'success' ? 'status-ok' : 'status-err'}"></span>${data.source}</div>
-            <div>Last Update: ${data.timestamp}</div>
-            <div style="font-size:0.75rem; color:#999; margin-top:4px;">Refreshes in: <span id="timer">30</span>s</div>
-            <div class="refresh-hint">Page auto-reloads every 30s</div>
-        </div>
-    </div>
-</body>
-</html>
-`;
+  </head>
+  <body>
+    ${contentHtml}
+  </body>
+  </html>
+  `;
 };
 
-// Fetch data periodically (every 30 seconds)
-async function updateData() {
-    console.log('Fetching latest HSI data from AASTOCKS...');
-    const data = await getHsiData();
-    latestHsiData = data;
-    if (data.status === 'success') {
-        console.log(`✓ HSI Price: ${data.price}`);
-    } else {
-        console.log(`✗ Fetch failed: ${data.errorMsg}`);
-    }
-}
-
-// Initial fetch
-updateData();
-// Auto-update every 30 seconds
-setInterval(updateData, 30000);
-
-const server = http.createServer(async (req, res) => {
-    if (req.url === '/' || req.url === '/index.html') {
-        const html = generateHtml(latestHsiData);
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(html);
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('404 Not Found');
-    }
+// Server Setup
+const server = http.createServer((req, res) => {
+  if (req.url === '/' || req.url === '/index.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(generateHtml(latestData));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('404 Not Found');
+  }
 });
 
+// Start Up
+updateAllData(); // Initial fetch
+setInterval(updateAllData, config.refreshIntervalSeconds * 1000);
+
 server.listen(PORT, HOST, () => {
-    console.log(`🚀 HSI Server Running`);
-    console.log(`====================`);
-    console.log(`🌐 URL: http://localhost:${PORT}`);
-    console.log(`📁 Workspace: ${path.join(__dirname, '..')}`);
-    console.log(`\nPress Ctrl+C to stop`);
+  console.log(`\n🚀 HSI Viewer Server Running`);
+  console.log(`==========================`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`⚙️  Config: ${configPath}`);
+  console.log(`🔄 Refresh: ${config.refreshIntervalSeconds}s`);
+  console.log(`\nPress Ctrl+C to stop\n`);
 });

@@ -29,7 +29,7 @@ yarn-error.log*
 *.key
 *.pem
 credentials.json
-config.json
+# Note: config.json is NOT ignored here as it's the app config for HSI viewer
 
 # OS files
 .DS_Store

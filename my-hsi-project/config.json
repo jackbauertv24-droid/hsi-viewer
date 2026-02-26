@@ -1,0 +1,29 @@
+{
+  "refreshIntervalSeconds": 30,
+  "dataPoints": [
+    {
+      "id": "hsi",
+      "name": "Hang Seng Index",
+      "unit": "HKD",
+      "tolerancePercent": 1.5,
+      "sources": [
+        {
+          "id": "aastocks",
+          "name": "AASTOCKS",
+          "url": "http://www.aastocks.com",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "regex": "(?:Hang\\s*Seng|HSI|恒生 | 恒指)[^0-9]{0,200}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
+        },
+        {
+          "id": "marketwatch-hk",
+          "name": "MarketWatch HK",
+          "url": "https://www.marketwatch.com/tools/markets/stocks/marketsummary/hk",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+          "regex": "Hang Seng.*?(\\d{1,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
+        }
+      ]
+    }
+  ]
+}

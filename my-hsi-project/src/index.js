@@ -49,7 +49,7 @@ async function getHsiData() {
 
         if (contextMatch && contextMatch[1]) {
             // Clean the price string (remove commas)
-            const price = parseFloat(priceStr.replace(/,/g, ''));
+            const price = parseFloat(contextMatch[1].replace(/,/g, ''));
             
             return {
                 price: price,

@@ -1,5 +1,6 @@
 {
-  "refreshIntervalSeconds": 30,
+  "refreshIntervalSeconds": 300,
+  "jitterSeconds": 10,
   "dataPoints": [
     {
       "id": "hsi",

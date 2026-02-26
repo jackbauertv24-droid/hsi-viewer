@@ -148,9 +148,22 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// Start Up
-updateAllData(); // Initial fetch
-setInterval(updateAllData, config.refreshIntervalSeconds * 1000);
+// Start Up: Recursive scheduler with jitter for polite scraping
+async function scheduleNext() {
+  const baseInterval = config.refreshIntervalSeconds * 1000;
+  const jitter = config.jitterSeconds ? (Math.random() * config.jitterSeconds * 1000) : 0;
+  const delay = baseInterval + jitter;
+  
+  console.log(`\n⏱️  Next update in ${(delay/1000).toFixed(0)}s (Base: ${config.refreshIntervalSeconds}s + Jitter: ${(jitter/1000).toFixed(1)}s)...`);
+  
+  setTimeout(async () => {
+    await updateAllData();
+    scheduleNext();
+  }, delay);
+}
+
+updateAllData(); // Initial fetch immediately
+scheduleNext(); // Schedule recurring updates with random jitter
 
 server.listen(PORT, HOST, () => {
   console.log(`\n🚀 HSI Viewer Server Running`);

@@ -185,7 +185,7 @@ const generateHtml = (data) => {
   `;
 };
 
-// Server Setup
+// Create HTTP server
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/index.html') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -196,19 +196,30 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// Start Up: Recursive scheduler with jitter for polite scraping
-async function scheduleNext() {
+// Start the HTTP server
+server.listen(PORT, HOST, () => {
+  console.log(`\n🚀 HSI Viewer Server Running`);
+  console.log(`==========================`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`⚙️  Config: ${configPath}`);
+  console.log(`🔄 Refresh: ${config.refreshIntervalSeconds}s`);
+  console.log(`\nPress Ctrl+C to stop\n`);
+  
+  // Start the data fetching cycle
+  updateAllData(); // Initial fetch immediately
+  
+  // Schedule next update with jitter
+  scheduleNext();
+});
+
+// Recursive scheduler with jitter for polite scraping
+function scheduleNext() {
   const baseInterval = config.refreshIntervalSeconds * 1000;
   const jitter = config.jitterSeconds ? (Math.random() * config.jitterSeconds * 1000) : 0;
   const delay = baseInterval + jitter;
   
-  console.log(`\n⏱️  Sleeping for ${(delay/1000).toFixed(0)}s (Base: ${config.refreshIntervalSeconds}s + Jitter: ${(jitter/1000).toFixed(1)}s)...`);
-  
-  setTimeout(async () => {
-    await updateAllData();
+  setTimeout(() => {
+    updateAllData();
     scheduleNext();
   }, delay);
 }
-
-updateAllData(); // Initial fetch immediately
-scheduleNext(); // Schedule recurring updates with random jitter

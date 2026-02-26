@@ -38,6 +38,14 @@
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           "regex": "(?:Hang Seng|HSI|Index)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
+        },
+        {
+          "id": "hsi-official",
+          "name": "HSI Company (Official)",
+          "url": "https://www.hsi.com.hk/eng",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "regex": "(?:Hang Seng|HSI|Index|恒生指數 | 恒指)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
         }
       ]
     }

@@ -22,6 +22,14 @@
           "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           "regex": "(?:Hang Seng|HSI|Index)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
           "group": 1
+        },
+        {
+          "id": "bloomberg",
+          "name": "Bloomberg",
+          "url": "https://www.bloomberg.com/quote/HSI:IND?embedded-checkout=true",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "regex": "(?:Hang Seng|HSI|Index)[\\s\\S]{0,500}?(\\d{2,3}(?:,\\d{3})+\\.\\d{2})",
+          "group": 1
         }
       ]
     }
